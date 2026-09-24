@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠 JD Assistant
+#  JD Assistant
 
 ### AI-powered Job Description Analyser — Grounded Q&A · Interview Prep · Resume Gap Analysis
 
@@ -155,8 +155,8 @@ Start the backend:
 uvicorn main:app --reload --port 8000
 ```
 
-✅ Backend running at `http://localhost:8000`
-📖 API docs at `http://localhost:8000/docs`
+Backend running at `http://localhost:8000`
+ API docs at `http://localhost:8000/docs`
 
 ---
 
@@ -170,7 +170,7 @@ npm install
 npm run dev
 ```
 
-✅ Frontend running at `http://localhost:5173`
+ Frontend running at `http://localhost:5173`
 
 ---
 
@@ -254,21 +254,4 @@ Single API key, single ecosystem. `text-embedding-001` has strong retrieval perf
 **Grounding enforcement**
 The Q&A prompt explicitly instructs the model: *"use ONLY the context provided"* and *"say 'This is not stated in this posting' if the answer isn't there."* This is enforced at the prompt level, not post-processed.
 
----
 
-## What I'd Improve With More Time
-
-- **Persistence** — serialise the vector store to SQLite so JDs survive server restarts
-- **Streaming** — stream Q&A answers token-by-token via SSE for snappier UX
-- **Multi-JD** — allow ingesting and switching between multiple JDs per session  
-- **Sentence-aware chunking** — use `nltk.sent_tokenize` instead of word-count windows to avoid mid-sentence cuts
-- **Citation highlighting** — return character offsets so the UI can highlight exact JD text that grounded an answer
-- **Auth** — simple API key header check to prevent abuse on a public endpoint
-
----
-
-<div align="center">
-
-Built with FastAPI · Gemini RAG · React · Vite
-
-</div>
