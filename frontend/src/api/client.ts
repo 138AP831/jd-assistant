@@ -1,9 +1,12 @@
 /**
  * Typed API client for the JD Assistant backend.
- * All requests go to VITE_API_URL (set per-environment).
+ *
+ * - On Vercel: frontend and backend share the same domain.
+ *   BASE_URL is empty — all requests go to /api/* on the same origin.
+ * - Locally: VITE_API_URL=http://localhost:8000 in frontend/.env.local
  */
 
-const BASE_URL = (import.meta.env.VITE_API_URL as string) ?? "http://localhost:8000";
+const BASE_URL = (import.meta.env.VITE_API_URL as string) ?? "";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -98,7 +101,7 @@ export async function extractResume(file: File): Promise<ExtractResumeResponse> 
   form.append("file", file);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
     const res = await fetch(`${BASE_URL}/api/extract-resume`, {
@@ -115,7 +118,7 @@ export async function extractResume(file: File): Promise<ExtractResumeResponse> 
     return res.json() as Promise<ExtractResumeResponse>;
   } catch (e: unknown) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new Error("Request timed out. Make sure the backend is running and dependencies are installed (run install_resume_deps.bat).");
+      throw new Error("Request timed out. Make sure the backend is running.");
     }
     throw e;
   } finally {
