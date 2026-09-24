@@ -238,20 +238,4 @@ jd-assistant/
 
 Full interactive docs available at `http://localhost:8000/docs` (Swagger UI).
 
----
-
-## Design Decisions
-
-**Why chunk + retrieve instead of full JD in prompt?**
-JDs vary from 200 to 2000+ words. Chunking + cosine retrieval scales to any length, keeps context focused on the most relevant passages per query, and avoids token limit issues.
-
-**Why in-memory vector store?**
-Zero infrastructure needed. For a demo/assignment scope this is the right tradeoff. Production would use Supabase pgvector or Pinecone for persistence across server restarts.
-
-**Why Gemini embeddings + generation?**
-Single API key, single ecosystem. `text-embedding-001` has strong retrieval performance at 768 dimensions. `gemini-3.5-flash-lite` is fast and has a high free-tier RPM limit.
-
-**Grounding enforcement**
-The Q&A prompt explicitly instructs the model: *"use ONLY the context provided"* and *"say 'This is not stated in this posting' if the answer isn't there."* This is enforced at the prompt level, not post-processed.
-
 
