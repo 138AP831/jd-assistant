@@ -1,10 +1,84 @@
-# JD Assistant — Grounded Q&A + Interview Prep
+<div align="center">
 
-A full-stack AI tool that lets you paste any job description and get:
+# 🧠 JD Assistant
 
-1. **Grounded Q&A** — free-text questions answered using only the JD content (says "not stated in this posting" when the JD doesn't address something)
-2. **Interview Prep** — categorised questions (Technical / Behavioral / Role-specific) tied to specific requirements in the JD, each with a one-line rationale
-3. **Resume Weak Spots** *(optional)* — paste your resume for a personalised gap analysis against the JD
+### AI-powered Job Description Analyser — Grounded Q&A · Interview Prep · Resume Gap Analysis
+
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
+[![Gemini](https://img.shields.io/badge/Gemini-RAG-4285F4?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev)
+
+</div>
+
+---
+
+## Architecture
+
+<div align="center">
+  <img src="./architecture.svg" alt="JD Assistant Architecture Diagram" width="100%"/>
+</div>
+
+### Data Flow
+
+```
+User pastes JD
+      │
+      ▼
+POST /api/ingest
+      │
+      ├─► chunk_text()        — sliding window, 150 words, 30-word overlap
+      │
+      ├─► embed_documents()   — Gemini text-embedding-001, task=retrieval_document
+      │
+      └─► VectorStore.add()   — numpy float32 matrix, in-memory
+
+User asks question
+      │
+      ▼
+POST /api/ask
+      │
+      ├─► embed_query()       — same model, task=retrieval_query
+      │
+      ├─► VectorStore.search()— cosine similarity, top-5 chunks returned
+      │
+      └─► Gemini generate()   — grounded prompt → "not stated" fallback
+
+User clicks Interview Prep
+      │
+      ▼
+POST /api/interview-prep
+      │
+      └─► All JD chunks → Gemini → 3 categories × 4+ questions + rationale
+
+User uploads resume
+      │
+      ▼
+POST /api/extract-resume     — PDF (PyPDF2) / DOCX (python-docx) / TXT
+      │
+      ▼
+POST /api/weak-spots
+      │
+      └─► JD chunks + resume → Gemini gap analysis → area + reason pairs
+
+Floating coach bot
+      │
+      ▼
+POST /api/coach              — free-form interview advice, 10-turn history
+```
+
+---
+
+## Features
+
+| Feature | Description |
+|---|---|
+| **Grounded Q&A** | Ask anything about the JD — answers cite only JD content, never hallucinate. Says *"not stated in this posting"* when the answer isn't there |
+| **Interview Prep** | Generates Technical / Behavioral / Role-specific questions tied to specific JD requirements, each with a one-line rationale |
+| **Resume Weak Spots** | Upload your resume (PDF, DOCX, TXT) for a personalised gap analysis against the JD |
+| **Interview Coach Bot** | Floating chat bot for general interview advice — STAR method, salary negotiation, system design tips |
+| **RAG Pipeline** | Chunk → embed → retrieve → generate. Scales to any JD length without hitting token limits |
 
 ---
 
@@ -13,150 +87,188 @@ A full-stack AI tool that lets you paste any job description and get:
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + Vite + TypeScript |
-| Backend | FastAPI (Python 3.11+) |
-| Embeddings | Google Gemini `text-embedding-004` (dim=768) |
-| Generation | Google Gemini `gemini-1.5-flash` |
-| Retrieval | In-memory cosine similarity (numpy) |
-| Deployment | Vercel (frontend) + Render (backend) |
-
----
-
-## Architecture
-
-```
-User pastes JD
-    └─▶ POST /api/ingest
-            └─▶ chunk_text() — sliding-window, 150 words, 30-word overlap
-            └─▶ embed_documents() — Gemini text-embedding-004, task_type=retrieval_document
-            └─▶ VectorStore.add() — numpy float32 matrix, in-memory
-
-User asks question
-    └─▶ POST /api/ask
-            └─▶ embed_query() — same model, task_type=retrieval_query
-            └─▶ VectorStore.search() — cosine similarity, top-5 chunks
-            └─▶ Gemini 1.5 Flash — grounded prompt, explicit "not stated" fallback
-
-User requests interview prep
-    └─▶ POST /api/interview-prep
-            └─▶ All JD chunks passed as context
-            └─▶ Gemini returns JSON: 3 categories × N questions × rationale
-
-User pastes resume (optional)
-    └─▶ POST /api/weak-spots
-            └─▶ All JD chunks + resume passed to Gemini
-            └─▶ Gap analysis: area + reason pairs
-```
+| Backend | FastAPI (Python 3.12) |
+| Embeddings | Google Gemini `text-embedding-001` (768-dim) |
+| Generation | Google Gemini `gemini-3.5-flash-lite` |
+| Vector Search | In-memory cosine similarity (numpy) |
+| Resume Parsing | PyPDF2 + python-docx (server) · DecompressionStream API (browser, DOCX) |
 
 ---
 
 ## Local Setup
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- A [Google AI Studio](https://aistudio.google.com) API key (free tier works)
 
-### Backend
+- Python **3.12+**
+- Node.js **18+**
+- A free [Google AI Studio](https://aistudio.google.com/app/apikey) API key
+
+---
+
+### 1 — Clone the repo
+
+```bash
+git clone https://github.com/138AP831/jd-assistant.git
+cd jd-assistant
+```
+
+---
+
+### 2 — Backend setup
 
 ```bash
 cd backend
+
+# Create and activate virtual environment
 python -m venv venv
-# Windows:
+
+# Windows
 venv\Scripts\activate
-# macOS/Linux:
+
+# macOS / Linux
 source venv/bin/activate
 
+# Install dependencies
 pip install -r requirements.txt
+```
 
-# Copy and fill in your API key
+Create your `.env` file:
+
+```bash
+# Windows
 copy .env.example .env
-# Edit .env: set GOOGLE_API_KEY=your_key_here
 
+# macOS / Linux
+cp .env.example .env
+```
+
+Open `backend/.env` and set your API key:
+
+```env
+GOOGLE_API_KEY=your_gemini_api_key_here
+ALLOWED_ORIGINS=http://localhost:5173
+```
+
+Start the backend:
+
+```bash
 uvicorn main:app --reload --port 8000
 ```
 
-Backend runs at `http://localhost:8000`. Check `http://localhost:8000/docs` for the interactive API docs.
+✅ Backend running at `http://localhost:8000`
+📖 API docs at `http://localhost:8000/docs`
 
-### Frontend
+---
+
+### 3 — Frontend setup
+
+Open a **new terminal**:
 
 ```bash
 cd frontend
 npm install
-# .env.local is already set to http://localhost:8000
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173`.
+✅ Frontend running at `http://localhost:5173`
 
 ---
 
-## Deployment
+### 4 — Use the app
 
-### Backend → Render
+1. Open `http://localhost:5173`
+2. Paste a job description → click **Analyse JD**
+3. Ask questions in the **Q&A** tab
+4. Generate questions in **Interview Prep**
+5. Upload your resume in **Weak Spots** for gap analysis
+6. Use the **orange bot button** (bottom-right) to chat with the Interview Coach
 
-1. Push the repo to GitHub.
-2. Create a new **Web Service** on Render, point it at the repo.
-3. Set **Root Directory** to `backend`.
-4. **Build Command:** `pip install -r requirements.txt`
-5. **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
-6. Add environment variables in the Render dashboard:
-   - `GOOGLE_API_KEY` — your Gemini API key
-   - `ALLOWED_ORIGINS` — your Vercel URL (e.g. `https://jd-assistant.vercel.app`)
+---
 
-### Frontend → Vercel
+## Project Structure
 
-1. Import the repo on Vercel.
-2. Set **Root Directory** to `frontend`.
-3. Add environment variable: `VITE_API_URL=https://your-render-service.onrender.com`
-4. Deploy.
+```
+jd-assistant/
+├── backend/
+│   ├── main.py                  # FastAPI app, CORS, startup
+│   ├── requirements.txt
+│   ├── .env.example
+│   ├── models/
+│   │   └── schemas.py           # Pydantic request/response models
+│   ├── routers/
+│   │   └── jd.py                # All API endpoints
+│   └── services/
+│       ├── chunker.py           # Sliding-window text chunker
+│       ├── embedder.py          # Gemini embedding wrapper
+│       ├── vector_store.py      # In-memory cosine similarity store
+│       ├── llm.py               # Gemini generation + prompt templates
+│       └── resume_parser.py     # PDF / DOCX / TXT text extraction
+│
+└── frontend/
+    ├── src/
+    │   ├── api/
+    │   │   ├── client.ts        # Typed fetch wrappers
+    │   │   └── resumeExtractor.ts # Client-side DOCX/TXT extraction
+    │   ├── components/
+    │   │   ├── Icons.tsx        # SVG icon library
+    │   │   ├── JDInput.tsx      # JD paste + ingest
+    │   │   ├── ChatBox.tsx      # Grounded Q&A chat
+    │   │   ├── InterviewPrep.tsx# Tabbed interview questions
+    │   │   ├── WeakSpots.tsx    # Resume upload + gap analysis
+    │   │   └── FloatingBot.tsx  # Interview coach chat widget
+    │   ├── App.tsx              # Sidebar layout + routing
+    │   └── App.css              # Design system + all styles
+    ├── package.json
+    └── vite.config.ts
+```
 
 ---
 
 ## API Reference
 
-| Method | Path | Body | Description |
+| Method | Endpoint | Body | Description |
 |---|---|---|---|
 | `GET` | `/health` | — | Health check |
-| `POST` | `/api/ingest` | `{"jd_text": "..."}` | Chunk + embed + store JD |
+| `POST` | `/api/ingest` | `{"jd_text": "..."}` | Chunk, embed, and store JD |
 | `POST` | `/api/ask` | `{"question": "..."}` | Grounded Q&A |
 | `POST` | `/api/interview-prep` | `{}` | Generate interview questions |
 | `POST` | `/api/weak-spots` | `{"resume_text": "..."}` | Resume gap analysis |
+| `POST` | `/api/extract-resume` | `multipart/form-data file` | Parse resume file → text |
+| `POST` | `/api/coach` | `{"message": "...", "history": [...]}` | Interview coach chat |
 
-Full interactive docs at `/docs` (Swagger UI) when the backend is running.
+Full interactive docs available at `http://localhost:8000/docs` (Swagger UI).
 
 ---
 
-## Design Decisions & Tradeoffs
+## Design Decisions
 
 **Why chunk + retrieve instead of full JD in prompt?**
-JDs vary wildly in length. Chunking + cosine retrieval scales to long JDs without hitting token limits, and keeps the context window focused on the most relevant passages per query.
+JDs vary from 200 to 2000+ words. Chunking + cosine retrieval scales to any length, keeps context focused on the most relevant passages per query, and avoids token limit issues.
 
 **Why in-memory vector store?**
-The simplest approach that meets the requirements. No database infrastructure to set up. The tradeoff: the store resets on server restart (Render's free tier spins down after inactivity). For production, serialising to SQLite or using Supabase pgvector would add persistence.
+Zero infrastructure needed. For a demo/assignment scope this is the right tradeoff. Production would use Supabase pgvector or Pinecone for persistence across server restarts.
 
-**Why Gemini text-embedding-004?**
-Stays in a single Google ecosystem (one API key), strong retrieval performance, 768-dim vectors are lightweight for in-memory storage. The `retrieval_document` / `retrieval_query` task type distinction is explicit and well-documented.
+**Why Gemini embeddings + generation?**
+Single API key, single ecosystem. `text-embedding-001` has strong retrieval performance at 768 dimensions. `gemini-3.5-flash-lite` is fast and has a high free-tier RPM limit.
 
-**Why gemini-1.5-flash over pro?**
-Speed and cost. Flash is fast enough for interactive Q&A and the prompts are structured enough that pro-level reasoning isn't needed. The grounded Q&A prompt explicitly constrains the model to the retrieved context, so the quality ceiling is the retrieval quality, not the model size.
-
-**Grounding approach**
-The Q&A prompt explicitly tells the model: "use ONLY the context provided, and say 'This is not stated in this posting' if the answer isn't there." This is a required behaviour per the assignment, not a nice-to-have.
+**Grounding enforcement**
+The Q&A prompt explicitly instructs the model: *"use ONLY the context provided"* and *"say 'This is not stated in this posting' if the answer isn't there."* This is enforced at the prompt level, not post-processed.
 
 ---
 
 ## What I'd Improve With More Time
 
-- **Persistence:** Serialise the vector store to disk (`.npy` + JSON) so Render restarts don't lose the ingested JD. Or swap to Supabase pgvector.
-- **Streaming responses:** Use Gemini's streaming API and SSE/WebSocket to stream Q&A answers token-by-token for a snappier UX.
-- **Multi-JD support:** Allow ingesting and switching between multiple JDs per session.
-- **Better chunking:** Sentence-boundary-aware chunking (using `nltk.tokenize.sent_tokenize`) instead of word-count windows to avoid cutting mid-sentence.
-- **Citation highlighting:** Return character offsets alongside chunks so the UI can highlight the exact JD text that grounded an answer.
-- **Auth:** A simple API-key header check on the FastAPI side to prevent abuse of the public endpoint.
+- **Persistence** — serialise the vector store to SQLite so JDs survive server restarts
+- **Streaming** — stream Q&A answers token-by-token via SSE for snappier UX
+- **Multi-JD** — allow ingesting and switching between multiple JDs per session  
+- **Sentence-aware chunking** — use `nltk.sent_tokenize` instead of word-count windows to avoid mid-sentence cuts
+- **Citation highlighting** — return character offsets so the UI can highlight exact JD text that grounded an answer
+- **Auth** — simple API key header check to prevent abuse on a public endpoint
 
 ---
 
-## AI Tools Used
+<div align="center">
 
-- **Kiro (Cursor-style AI IDE):** Used to scaffold the project, generate boilerplate, and iterate on prompt templates. All architectural decisions, prompt engineering, and component design were made collaboratively.
-- **Google AI Studio:** Used to test Gemini API calls and validate embedding + generation behaviour before integrating.
+Built with FastAPI · Gemini RAG · React · Vite
+
+</div>
