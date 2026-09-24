@@ -1,9 +1,9 @@
 /**
  * Typed API client for the JD Assistant backend.
  *
- * - On Vercel: frontend and backend share the same domain.
- *   BASE_URL is empty — all requests go to /api/* on the same origin.
- * - Locally: VITE_API_URL=http://localhost:8000 in frontend/.env.local
+ * - On Netlify/Vercel: same-origin — BASE_URL is empty, calls go to /api/*
+ *   which gets rewritten to the serverless function automatically.
+ * - Locally: set VITE_API_URL=http://localhost:8000 in frontend/.env.local
  */
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string) ?? "";
